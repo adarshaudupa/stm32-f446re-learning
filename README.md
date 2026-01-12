@@ -46,3 +46,27 @@ while (1)
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
   HAL_Delay(500);
 }
+
+### Day 5-6: Open-Drain Output (Register-Level)
+
+**Goal**: Understand open-drain GPIO configuration and validate with register-level debugging.
+
+#### Hardware Setup
+- **Pin**: PA9 (open-drain output)
+- **External pull-up**: 330Ω to 3.3V (temporary, 2.2kΩ recommended for production)
+- **Validation**: Digital multimeter + UART debug output
+
+#### Register Configuration
+```c
+// Enable GPIOA clock (required before any GPIO access)
+RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
+
+// Set PA9 to output mode
+GPIOA->MODER &= ~(0x3 << 18);  // Clear bits [19:18]
+GPIOA->MODER |= (0x1 << 18);   // Set to 01 (output)
+
+// Set PA9 to open-drain
+GPIOA->OTYPER |= (1 << 9);     // 1 = open-drain, 0 = push-pull
+
+// Disable internal pull-up/down
+GPIOA->PUPDR &= ~(0x3 << 18);  // 00 = no pull
