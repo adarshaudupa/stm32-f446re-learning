@@ -100,46 +100,28 @@ int main(void)
   MX_USART2_UART_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
-  // NEW: Manual register-level init for PA9 open-drain
-    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;  // Enable GPIOA clock
-    GPIOA->MODER &= ~(3<<16); //resets the 2 bits assigned to PA9([19:18])
-    GPIOA->MODER |= (1<<16); //sets PA9 to output(01 is output and 00 is input(resetting bits makes it 0 that is makes it input))
-    GPIOA->OTYPER |= (1<<8); //sets Output type to Open Drain
-    GPIOA->PUPDR &= ~(3<<16);//resets to 00 i.e. no pull up or pull down resistor)
+  // Enable SYSCFG clock (needed for EXTI mux)
+  RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
+  // Connect PC13 to EXTI line 13
+  SYSCFG->EXTICR[3] &= ~SYSCFG_EXTICR4_EXTI13;  // Clear
+  SYSCFG->EXTICR[3] |= SYSCFG_EXTICR4_EXTI13_PC; // Set to Port C
+
+  // Configure EXTI13 for falling edge (button press)
+  EXTI->FTSR |= EXTI_FTSR_TR13;   // Falling trigger
+  EXTI->RTSR &= ~EXTI_RTSR_TR13;  // Disable rising trigger
+  EXTI->IMR |= EXTI_IMR_MR13;     // Unmask interrupt
+
+  // Enable EXTI15_10 in NVIC (PC13 uses line 13)
+  NVIC_SetPriority(EXTI15_10_IRQn, 2);
+  NVIC_EnableIRQ(EXTI15_10_IRQn);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  // Toggle PA5 LED (your old working code) to confirm loop runs
-	     HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
-
-	     // Toggle PA9 open-drain
-	     GPIOA->ODR &= ~(1 << 8);
-	     HAL_Delay(250);
-
-	     GPIOA->ODR |= (1 << 8);
-	     HAL_Delay(250);
-	  // Toggle PA9 open-drain
-	      GPIOA->ODR &= ~(1 << 8);  // Drive LOW
-	      HAL_Delay(500);
-
-	      GPIOA->ODR |= (1 << 8);   // Release to HIGH (via external pull-up)
-	      HAL_Delay(500);
-
-	      // Optional: read back state
-	      uint32_t state = (GPIOA->IDR >> 9) & 0x1;
-
-	      HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);  // Visual heartbeat
-
-	          GPIOA->ODR &= ~(1 << 9);  // Drive LOW
-	          printf("PA9 ODR: 0x%lx (bit 9 = %d)\r\n", GPIOA->ODR, (GPIOA->ODR >> 9) & 1);
-	          HAL_Delay(500);
-
-	          GPIOA->ODR |= (1 << 9);   // Release HIGH
-	          printf("PA9 ODR: 0x%lx (bit 9 = %d)\r\n", GPIOA->ODR, (GPIOA->ODR >> 9) & 1);
-	          HAL_Delay(500);
+	  // Empty loop - LED toggles in ISR, not here
+	      HAL_Delay(100);
   }
   /* USER CODE END 3 */
 }
@@ -335,3 +317,15 @@ void assert_failed(uint8_t *file, uint32_t line)
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
+
+void EXTI15_10_IRQHandler(void)
+{
+    // Check if EXTI13 triggered this interrupt
+    if (EXTI->PR & EXTI_PR_PR13) {
+        // Clear pending bit (mandatory, or ISR loops forever)
+        EXTI->PR = EXTI_PR_PR13;
+
+        // Toggle LED
+        HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+    }
+}
