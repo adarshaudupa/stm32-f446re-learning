@@ -71,3 +71,28 @@ GPIOA->OTYPER |= (1 << 9);     // 1 = open-drain, 0 = push-pull
 // Disable internal pull-up/down
 GPIOA->PUPDR &= ~(0x3 << 18);  // 00 = no pull
 ```
+### Day 7: Interrupt-Driven GPIO (EXTI)
+
+**Goal**: Replace polling with hardware interrupts for instant response.
+
+#### Hardware Setup
+- PC13 button (falling edge trigger)
+- PA5 LED (toggles on each press)
+- Response time: <1µs vs 500ms polling delay
+
+#### Register Configuration
+```c
+// Enable SYSCFG clock
+RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
+
+// Route PC13 to EXTI line 13
+SYSCFG->EXTICR[1] |= SYSCFG_EXTICR4_EXTI13_PC;
+
+// Configure EXTI13 for falling edge
+EXTI->FTSR |= EXTI_FTSR_TR13;   // Falling trigger
+EXTI->IMR |= EXTI_IMR_MR13;     // Unmask interrupt
+
+// Enable in NVIC
+NVIC_SetPriority(EXTI15_10_IRQn, 2);
+NVIC_EnableIRQ(EXTI15_10_IRQn);
+```
